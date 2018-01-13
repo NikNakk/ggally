@@ -402,21 +402,32 @@ ggsurv_m <- function(
 }
 
 get_at_risk_table <- function(fit, at.risk.interval) {
-  fit_risk <- data.frame(
-    stratum = rep(names(fit$strata), fit$strata),
-    time = fit$time,
-    at_risk = fit$n.risk
-  )
-  max_by_stratum <- tapply(fit_risk$time, fit_risk$stratum, max)[names(fit$strata)]
+  if (!is.null(fit$strata)) {
+    n_strata <- length(fit$strata)
+    fit_risk <- data.frame(
+      stratum = rep(names(fit$strata), fit$strata),
+      time = fit$time,
+      at_risk = fit$n.risk
+    )
+    max_by_stratum <- tapply(fit_risk$time, fit_risk$stratum, max)[names(fit$strata)]
+  } else {
+    n_strata <- 1
+    fit_risk <- data.frame(
+      stratum = "",
+      time = fit$time,
+      at_risk = fit$n.risk
+    )
+    max_by_stratum <- max(fit$time)
+  }
   fit_risk <- rbind(
     fit_risk,
     data.frame(
-      stratum = names(fit$strata),
+      stratum = unique(fit_risk$stratum),
       time = max_by_stratum + 1,
       at_risk = 0
     ),
     data.frame(
-      stratum = names(fit$strata),
+      stratum = unique(fit_risk$stratum),
       time = 0,
       at_risk = fit$n
     )
@@ -427,7 +438,7 @@ get_at_risk_table <- function(fit, at.risk.interval) {
   }
   fit_risk_simple <- with(
     fit_risk,
-    expand.grid(time = seq(0, max(fit$time) + at.risk.interval - 0.01, at.risk.interval), stratum = levels(stratum))
+    expand.grid(time = seq(0, max(fit$time), at.risk.interval), stratum = levels(stratum))
     )
   fit_risk_simple$at_risk <- mapply(
     function(stratum, time) {
@@ -445,14 +456,14 @@ get_at_risk_table <- function(fit, at.risk.interval) {
   fit_risk_simple$y <- -as.numeric(fit_risk_simple$stratum)
 
   at_risk_labels <- data.frame(
-    at_risk = c("Number at risk", sub("[^=]+=", "", names(fit$strata))),
-    y = c(0, -seq_len(length(names(fit$strata)))),
+    at_risk = c("Number at risk", sub("[^=]+=", "", unique(fit_risk$stratum))),
+    y = c(0, -seq_len(n_strata)),
     time = -max(fit$time) / 6,
-    fontface = c(2, rep(1, length(names(fit$strata))))
+    fontface = c(2, rep(1, n_strata))
   )
 
-  xlims <- c(-max(fit$time) / 6, max(fit$time) + at.risk.interval - 0.01)
-  ylims <- c(-length(names(fit$strata)) - 1, 1)
+  xlims <- c(-max(fit$time) / 6, max(fit$time))
+  ylims <- c(-length(names(fit$strata)) - 2, 1)
 
   at_risk_plot <- ggplot(NULL, aes(y = y, x = time, label = at_risk)) +
     geom_text(data = fit_risk_simple) +
@@ -466,7 +477,7 @@ get_at_risk_table <- function(fit, at.risk.interval) {
       ggplotGrob(at_risk_plot),
       xmin = xlims[1],
       xmax = xlims[2],
-      ymin = -0.2 - 0.1 * length(fit$strata),
+      ymin = -0.3 - 0.1 * n_strata,
       ymax = -0.2
     )
 }
