@@ -7,7 +7,8 @@
 ggsurv(s, CI = "def", plot.cens = TRUE, surv.col = "gg.def",
   cens.col = "gg.def", lty.est = 1, lty.ci = 2, size.est = 0.5,
   size.ci = size.est, cens.size = 2, cens.shape = 3, back.white = FALSE,
-  xlab = "Time", ylab = "Survival", main = "", order.legend = TRUE)
+  xlab = "Time", ylab = "Survival", main = "", order.legend = TRUE,
+  include.at.risk.table = FALSE, at.risk.interval = NULL, theme = NULL)
 }
 \arguments{
 \item{s}{an object of class \code{survfit}}
@@ -47,6 +48,17 @@ grey of \code{ggplot2} but will be white with borders around the plot.}
 \item{main}{the plot label.}
 
 \item{order.legend}{boolean to determine if the legend display should be ordered by final survival time}
+
+\item{include.at.risk.table}{if TRUE a table of number of patients at risk
+will be included below}
+
+\item{at.risk.interval}{time interval for the at risk table, defaults to a
+tenth of the total time range}
+
+\item{theme}{theme to apply to the plot. Implemented because the margins are
+increased to accommodate the at risk table and adding a theme afterwards
+will reset the margins. Alternatively, a theme can be added and the bottom
+margin re-increased.}
 }
 \value{
 An object of class \code{ggplot}
