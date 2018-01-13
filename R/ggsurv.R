@@ -10,6 +10,7 @@ if(getRversion() >= "2.15.1") {
 #' multiple strata objects.
 #'
 #' @export
+#'
 #' @param s an object of class \code{survfit}
 #' @param CI should a confidence interval be plotted? Defaults to \code{TRUE}
 #'    for single stratum objects and \code{FALSE} for multiple strata objects.
@@ -31,7 +32,16 @@ if(getRversion() >= "2.15.1") {
 #' @param xlab the label of the x-axis.
 #' @param ylab the label of the y-axis.
 #' @param main the plot label.
+#' @param include.at.risk.table if TRUE a table of number of patients at risk
+#'    will be included below
+#' @param at.risk.interval time interval for the at risk table, defaults to a
+#'    tenth of the total time range
+#' @param theme theme to apply to the plot. Implemented because the margins are
+#'    increased to accommodate the at risk table and adding a theme afterwards
+#'    will reset the margins. Alternatively, a theme can be added and the bottom
+#'    margin re-increased.
 #' @param order.legend boolean to determine if the legend display should be ordered by final survival time
+#'
 #' @return An object of class \code{ggplot}
 #' @author Edwin Thoen \email{edwinthoen@@gmail.com}
 #' @importFrom stats time
@@ -101,7 +111,8 @@ ggsurv <- function(
   main       = '',
   order.legend = TRUE,
   include.at.risk.table = FALSE,
-  at.risk.interval = NULL
+  at.risk.interval = NULL,
+  theme = NULL
 ){
 
   require_pkgs(c("survival", "scales"))
@@ -122,6 +133,9 @@ ggsurv <- function(
     cens.shape, back.white, xlab,
     ylab, main, strata, order.legend
   )
+  if (!is.null(theme)) {
+    pl <- pl + theme
+  }
   if (include.at.risk.table) {
     pl <- pl +
       get_at_risk_table(s, at.risk.interval) +
@@ -409,7 +423,6 @@ get_at_risk_table <- function(fit, at.risk.interval) {
       time = fit$time,
       at_risk = fit$n.risk
     )
-    max_by_stratum <- tapply(fit_risk$time, fit_risk$stratum, max)[names(fit$strata)]
   } else {
     n_strata <- 1
     fit_risk <- data.frame(
@@ -417,21 +430,7 @@ get_at_risk_table <- function(fit, at.risk.interval) {
       time = fit$time,
       at_risk = fit$n.risk
     )
-    max_by_stratum <- max(fit$time)
   }
-  fit_risk <- rbind(
-    fit_risk,
-    data.frame(
-      stratum = unique(fit_risk$stratum),
-      time = max_by_stratum + 1,
-      at_risk = 0
-    ),
-    data.frame(
-      stratum = unique(fit_risk$stratum),
-      time = 0,
-      at_risk = fit$n
-    )
-  )
   fit_risk <- fit_risk[order(fit_risk$stratum, fit_risk$time), ]
   if (is.null(at.risk.interval)) {
     at.risk.interval = diff(range(fit$time)) / 10
@@ -443,11 +442,11 @@ get_at_risk_table <- function(fit, at.risk.interval) {
   fit_risk_simple$at_risk <- mapply(
     function(stratum, time) {
       which_at_risk <- which(fit_risk$stratum == stratum &
-                               fit_risk$time <= time)
+                               fit_risk$time > time)
       if (length(which_at_risk) > 0L) {
-        fit_risk$at_risk[which_at_risk[length(which_at_risk)]]
+        fit_risk$at_risk[which_at_risk[1]]
       } else {
-        NA_integer_
+        0
       }
     },
     fit_risk_simple$stratum,
@@ -473,11 +472,11 @@ get_at_risk_table <- function(fit, at.risk.interval) {
     scale_x_continuous(NULL, limits = xlims, expand = c(0, 0)) +
     scale_y_continuous(NULL, limits = ylims, expand = c(0, 0))
 
-    annotation_custom(
-      ggplotGrob(at_risk_plot),
-      xmin = xlims[1],
-      xmax = xlims[2],
-      ymin = -0.3 - 0.1 * n_strata,
-      ymax = -0.2
-    )
+  annotation_custom(
+    ggplotGrob(at_risk_plot),
+    xmin = xlims[1],
+    xmax = xlims[2],
+    ymin = -0.3 - 0.1 * n_strata,
+    ymax = -0.2
+  )
 }
