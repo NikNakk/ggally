@@ -99,7 +99,9 @@ ggsurv <- function(
   xlab       = 'Time',
   ylab       = 'Survival',
   main       = '',
-  order.legend = TRUE
+  order.legend = TRUE,
+  include.at.risk.table = FALSE,
+  at.risk.interval = NULL
 ){
 
   require_pkgs(c("survival", "scales"))
@@ -120,6 +122,11 @@ ggsurv <- function(
     cens.shape, back.white, xlab,
     ylab, main, strata, order.legend
   )
+  if (include.at.risk.table) {
+    pl <- pl +
+      get_at_risk_table(s, at.risk.interval) +
+      theme(plot.margin = unit(c(0.05, 0.05, 0.2, 0.05), "native"))
+  }
   pl
 }
 
@@ -392,4 +399,74 @@ ggsurv_m <- function(
   }
 
   pl
+}
+
+get_at_risk_table <- function(fit, at.risk.interval) {
+  fit_risk <- data.frame(
+    stratum = rep(names(fit$strata), fit$strata),
+    time = fit$time,
+    at_risk = fit$n.risk
+  )
+  max_by_stratum <- tapply(fit_risk$time, fit_risk$stratum, max)[names(fit$strata)]
+  fit_risk <- rbind(
+    fit_risk,
+    data.frame(
+      stratum = names(fit$strata),
+      time = max_by_stratum + 1,
+      at_risk = 0
+    ),
+    data.frame(
+      stratum = names(fit$strata),
+      time = 0,
+      at_risk = fit$n
+    )
+  )
+  fit_risk <- fit_risk[order(fit_risk$stratum, fit_risk$time), ]
+  if (is.null(at.risk.interval)) {
+    at.risk.interval = diff(range(fit$time)) / 10
+  }
+  fit_risk_simple <- with(
+    fit_risk,
+    expand.grid(time = seq(0, max(fit$time) + at.risk.interval - 0.01, at.risk.interval), stratum = levels(stratum))
+    )
+  fit_risk_simple$at_risk <- mapply(
+    function(stratum, time) {
+      which_at_risk <- which(fit_risk$stratum == stratum &
+                               fit_risk$time <= time)
+      if (length(which_at_risk) > 0L) {
+        fit_risk$at_risk[which_at_risk[length(which_at_risk)]]
+      } else {
+        NA_integer_
+      }
+    },
+    fit_risk_simple$stratum,
+    fit_risk_simple$time
+    )
+  fit_risk_simple$y <- -as.numeric(fit_risk_simple$stratum)
+
+  at_risk_labels <- data.frame(
+    at_risk = c("Number at risk", sub("[^=]+=", "", names(fit$strata))),
+    y = c(0, -seq_len(length(names(fit$strata)))),
+    time = -max(fit$time) / 6,
+    fontface = c(2, rep(1, length(names(fit$strata))))
+  )
+
+  xlims <- c(-max(fit$time) / 6, max(fit$time) + at.risk.interval - 0.01)
+  ylims <- c(-length(names(fit$strata)) - 1, 1)
+
+  at_risk_plot <- ggplot(NULL, aes(y = y, x = time, label = at_risk)) +
+    geom_text(data = fit_risk_simple) +
+    geom_text(aes(fontface = fontface), data = at_risk_labels, hjust = 0) +
+    theme_void() +
+    theme(axis.ticks.length = unit(0, "pt")) +
+    scale_x_continuous(NULL, limits = xlims, expand = c(0, 0)) +
+    scale_y_continuous(NULL, limits = ylims, expand = c(0, 0))
+
+    annotation_custom(
+      ggplotGrob(at_risk_plot),
+      xmin = xlims[1],
+      xmax = xlims[2],
+      ymin = -0.2 - 0.1 * length(fit$strata),
+      ymax = -0.2
+    )
 }
