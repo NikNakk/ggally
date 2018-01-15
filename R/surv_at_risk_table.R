@@ -92,7 +92,7 @@ surv_at_risk_table <- function(
   aesthetic <- aes(y = stratum, x = time, label = at_risk)
   if (!is.null(surv.col)) {
     aesthetic$colour <- as.name("stratum")
-    if (surv.col == "gg.def") {
+    if (surv.col[1] == "gg.def") {
       if (length(strata_names) > 1L) {
         surv.col <- scales::hue_pal()(length(strata_names))
       } else {
